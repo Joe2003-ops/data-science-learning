@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#f7f7f2" />
+    <meta name="description" content="A friendly, hands-on path into data science. Learn concepts, write Python, and shape a research question into a project." />
+    <title>Datafield — learn data science by doing</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <svg class="icon-library" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></symbol>
+      <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"/><path d="M4 5.5v16M8 7h8M8 11h8"/></symbol>
+      <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></symbol>
+      <symbol id="i-flask" viewBox="0 0 24 24"><path d="M9 3h6M10 3v6.5l-5.5 9A1.7 1.7 0 0 0 6 21h12a1.7 1.7 0 0 0 1.5-2.5l-5.5-9V3M8 15h8"/></symbol>
+      <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-4-6 4z"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.8" cy="10.8" r="6.8"/><path d="m16 16 4.5 4.5"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+      <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M13 5l7 7-7 7"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><path d="m9 5 10 7-10 7z" fill="currentColor" stroke="none"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7"/></symbol>
+      <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></symbol>
+      <symbol id="i-trend" viewBox="0 0 24 24"><path d="m3 17 6-6 4 4 8-9M15 6h6v6"/></symbol>
+      <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+      <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m0 0 5-5m-5 5-5-5M5 20h14"/></symbol>
+      <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3A5 5 0 0 0 13.5 3L12 4.5M14 11a5 5 0 0 0-7.5-.5l-3 3A5 5 0 0 0 10.5 21L12 19.5"/></symbol>
+      <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="8.5" ry="3"/><path d="M3.5 5v7c0 1.7 3.8 3 8.5 3s8.5-1.3 8.5-3V5M3.5 12v7c0 1.7 3.8 3 8.5 3s8.5-1.3 8.5-3v-7"/></symbol>
+      <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></symbol>
+      <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 1.7 5.3L19 10l-5.3 1.7L12 17l-1.7-5.3L5 10l5.3-1.7zM19 15l1 2.5 2.5 1-2.5 1L19 22l-1-2.5-2.5-1 2.5-1z"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol>
+    </svg>
+
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <a class="brand" href="#dashboard" aria-label="Datafield home" data-page="dashboard">
+          <span class="brand-mark"><span></span><span></span><span></span><span></span></span>
+          <span class="brand-name">datafield<span class="brand-dot">.</span><small>LEARN BY DOING</small></span>
+        </a>
+        <div class="workspace-label">YOUR SPACE</div>
+        <nav class="primary-nav" aria-label="Main navigation">
+          <button class="nav-link active" data-page="dashboard"><svg><use href="#i-grid"/></svg><span>Overview</span></button>
+          <button class="nav-link" data-page="learning"><svg><use href="#i-book"/></svg><span>Learning path</span><span class="nav-count">06</span></button>
+          <button class="nav-link" data-page="workspace"><svg><use href="#i-code"/></svg><span>Code workspace</span><span class="nav-live"></span></button>
+          <button class="nav-link" data-page="research"><svg><use href="#i-flask"/></svg><span>Research studio</span></button>
+          <button class="nav-link" data-page="resources"><svg><use href="#i-bookmark"/></svg><span>Field notes</span></button>
+        </nav>
+        <div class="sidebar-projects">
+          <div class="section-label-row"><span class="workspace-label">MY PROJECTS</span><button class="icon-button small" id="new-project" aria-label="Create a research project"><svg><use href="#i-plus"/></svg></button></div>
+          <button class="project-link" data-page="research"><span class="project-dot dot-coral"></span><span>Untitled research</span><span class="project-edit">···</span></button>
+          <button class="project-link muted" data-page="research"><span class="project-dot dot-blue"></span><span>+ Start a new project</span></button>
+        </div>
+        <div class="sidebar-bottom">
+          <div class="streak-mini"><span class="flame">✳</span><span><b id="sidebar-streak">3 day streak</b><small>A little progress adds up.</small></span></div>
+          <button class="profile-row" id="profile-button"><span class="avatar">JD</span><span><b>Jordan Davis</b><small>Curious beginner</small></span><svg><use href="#i-chevron"/></svg></button>
+        </div>
+      </aside>
+
+      <div class="main-column">
+        <header class="topbar">
+          <button class="mobile-menu icon-button" id="mobile-menu" aria-label="Open navigation"><svg><use href="#i-menu"/></svg></button>
+          <div class="crumb"><span>My learning</span><span class="crumb-slash">/</span><b id="page-crumb">Overview</b></div>
+          <div class="topbar-actions">
+            <button class="search-button" id="open-search"><svg><use href="#i-search"/></svg><span>Search lessons, concepts...</span><kbd>⌘ K</kbd></button>
+            <button class="icon-button notification-button" id="notifications" aria-label="Notifications"><svg><use href="#i-bell"/></svg><i></i></button>
+            <span class="top-avatar">JD</span>
+          </div>
+        </header>
+        <main id="main-view" class="main-view" tabindex="-1"></main>
+        <footer class="app-footer"><span>Made for the wonderfully curious.</span><span>Progress saved on this device <i class="save-dot"></i></span></footer>
+      </div>
+    </div>
+
+    <nav class="mobile-nav" aria-label="Mobile navigation">
+      <button class="mobile-nav-link active" data-page="dashboard"><svg><use href="#i-grid"/></svg><span>Home</span></button>
+      <button class="mobile-nav-link" data-page="learning"><svg><use href="#i-book"/></svg><span>Learn</span></button>
+      <button class="mobile-nav-link" data-page="workspace"><svg><use href="#i-code"/></svg><span>Code</span></button>
+      <button class="mobile-nav-link" data-page="research"><svg><use href="#i-flask"/></svg><span>Research</span></button>
+    </nav>
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <dialog class="search-dialog" id="search-dialog">
+      <form method="dialog"><div class="search-dialog-input"><svg><use href="#i-search"/></svg><input id="search-input" placeholder="Find a lesson or concept..." autocomplete="off" /><kbd>ESC</kbd><button class="icon-button small" aria-label="Close search"><svg><use href="#i-x"/></svg></button></div></form>
+      <div class="search-results" id="search-results"></div>
+    </dialog>
+  </body>
+</html>

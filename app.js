@@ -59,7 +59,7 @@ if (!profiles.length) {
   profiles = [defaultProfile];
   STORE.set("profiles", profiles);
   if (!Array.isArray(storedProfiles)) {
-    for (const key of ["dataset", "code", "research", "tasks", "completed"]) {
+    for (const key of ["dataset", "code", "research", "tasks", "completed", "activity"]) {
       const oldValue = STORE.get(key, null);
       if (oldValue !== null) STORE.setProfile(defaultProfile.id, key, oldValue);
     }
@@ -84,6 +84,43 @@ let research = profileRead("research", { title: "", question: "", hypothesis: ""
 if (!Array.isArray(research.sources)) research.sources = [];
 let tasks = profileRead("tasks", [false, false, false]);
 let completed = profileRead("completed", [true, false, false, false, false, false]);
+let activity = profileRead("activity", []);
+if (!Array.isArray(activity)) activity = [];
+
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+function recordProgress() {
+  const today = localDateKey();
+  if (!activity.includes(today)) {
+    activity = [...activity, today];
+    profileSave("activity", activity);
+    updateProfileLabels();
+  }
+}
+function getWeekActivity() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(monday);
+    date.setDate(monday.getDate() + index);
+    return { date, active: activity.includes(localDateKey(date)) };
+  });
+}
+function getCurrentStreak() {
+  const days = new Set(activity);
+  const cursor = new Date();
+  cursor.setHours(0, 0, 0, 0);
+  if (!days.has(localDateKey(cursor))) cursor.setDate(cursor.getDate() - 1);
+  let streak = 0;
+  while (days.has(localDateKey(cursor))) {
+    streak += 1;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
 
 function esc(value = "") { return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function toast(message) {
@@ -120,27 +157,46 @@ function updateProfileLabels() {
   const name = document.getElementById("profile-name");
   const sideAvatar = document.getElementById("profile-avatar");
   const topAvatar = document.getElementById("top-profile-button");
+  const streakLabel = document.getElementById("sidebar-streak");
+  const streak = getCurrentStreak();
   if (name) name.textContent = profile.name;
   if (sideAvatar) sideAvatar.textContent = initials;
   if (topAvatar) { topAvatar.textContent = initials; topAvatar.setAttribute("aria-label", `Open profiles · ${profile.name}`); }
+  if (streakLabel) streakLabel.textContent = `${streak} day${streak === 1 ? "" : "s"} streak`;
 }
 function renderDashboard() {
   const doneCount = completed.filter(Boolean).length;
   const progress = Math.round(doneCount / modules.length * 100);
+  const totalLessons = modules.reduce((sum, module) => sum + module.lessons, 0);
+  const completedLessons = modules.reduce((sum, module, index) => sum + (completed[index] ? module.lessons : 0), 0);
+  const nextIndex = completed.findIndex((isDone) => !isDone);
+  const selectedIndex = nextIndex === -1 ? modules.length - 1 : nextIndex;
+  const nextModule = modules[selectedIndex];
+  const streak = getCurrentStreak();
+  const week = getWeekActivity();
+  const activeDays = week.filter((day) => day.active).length;
   const firstName = activeProfile().name.trim().split(/\s+/)[0];
+  const moduleProgress = completed[selectedIndex] ? 100 : 0;
+  const weekBars = week.map((day, index) => {
+    const label = new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(day.date);
+    const height = day.active ? 42 + ((index * 17) % 45) : 14;
+    return `<div class="day-bar" title="${label}: ${day.active ? "progress logged" : "no progress yet"}" aria-label="${label}: ${day.active ? "progress logged" : "no progress yet"}"><i class="bar" style="height:${height}%;background:${day.active ? "#64bd81" : "#e9eee8"}"></i></div>`;
+  }).join("");
+  const weekLabels = week.map((day) => `<span>${esc(new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(day.date).slice(0, 1))}</span>`).join("");
   return `
     <div class="greeting-row"><div><div class="eyebrow">YOUR LEARNING, AT A GLANCE</div><h1>Good morning, ${esc(firstName)} <span aria-hidden="true">☀</span></h1><p>Small steps make for a very good data scientist.</p></div><div class="date-pill">${ICON("clock")}<span>${esc(dateLabel())}</span></div></div>
-    <section class="dashboard-hero"><div class="hero-copy"><div class="hero-kicker"><span></span>YOUR NEXT LITTLE WIN</div><h2>Curiosity is a great place to start.</h2><p>Pick up where you left off. Your next lesson is ready when you are.</p><button class="button-primary" data-go="learning">Continue your learning ${ICON("arrow")}</button></div><div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="hero-spark spark-one">✳</span><span class="hero-spark spark-two">✦</span><div class="hero-chip chip-top">↗ finding patterns</div><div class="chart-card"><div class="chart-label"><span>STUDY TIME ↗ SCORES</span><span>+18%</span></div><svg class="chart-svg" viewBox="0 0 190 80" preserveAspectRatio="none"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#afe6bb" stop-opacity=".32"/><stop offset="1" stop-color="#afe6bb" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M0 18H190M0 43H190M0 68H190"/><path class="chart-fill" d="M0 66 C23 63 26 54 45 57 S71 46 89 49 S116 23 131 32 S159 16 190 7V80H0Z"/><path class="chart-line" d="M0 66 C23 63 26 54 45 57 S71 46 89 49 S116 23 131 32 S159 16 190 7"/><circle class="chart-node" cx="131" cy="32" r="3.6"/><circle class="chart-node" cx="190" cy="7" r="3.6"/></svg></div><div class="hero-chip chip-bottom"><b>✳</b> one question at a time</div></div></section>
-    <section class="metrics-row"><div class="metric-card"><span class="metric-icon mint">${ICON("trend")}</span><span class="metric-copy"><small>Learning path</small><b>${progress}% <em>↗ on your way</em></b></span></div><div class="metric-card"><span class="metric-icon yellow">✳</span><span class="metric-copy"><small>Day streak</small><b>3 days <em>nice rhythm</em></b></span></div><div class="metric-card"><span class="metric-icon lavender">${ICON("clock")}</span><span class="metric-copy"><small>Time learning</small><b>2.4 hrs</b></span></div><div class="metric-card"><span class="metric-icon blue">${ICON("target")}</span><span class="metric-copy"><small>Lessons finished</small><b>${doneCount} <em>of 31</em></b></span></div></section>
-    <div class="dashboard-grid"><section><div class="section-heading"><h2>Pick up where you left off</h2><button data-go="learning">See your path ${ICON("arrow")}</button></div><article class="continue-card"><div class="course-art"><svg viewBox="0 0 48 48"><path d="M9 36h29M13 35V17l9-6 10 6v18M17 22h10M17 27h10M19 35v-4h7v4M9 17l13-9 16 9"/><circle cx="33" cy="13" r="3"/></svg></div><div class="course-info"><span class="course-tag">MODULE 02 · LESSON 02</span><h3>Python, your new toolkit</h3><p>Let’s make a list. Then make it useful.</p><div class="progress-line"><span style="width:32%"></span></div><div class="course-progress-meta"><span>2 of 5 lessons</span><span>32%</span></div></div><button class="icon-button" data-go="learning" aria-label="Continue learning">${ICON("arrow")}</button></article>
+    <section class="dashboard-hero"><div class="hero-copy"><div class="hero-kicker"><span></span>YOUR NEXT LITTLE WIN</div><h2>${doneCount === modules.length ? "You made it through the learning path." : "Curiosity is a great place to start."}</h2><p>${doneCount === modules.length ? "Your six modules are complete. Keep exploring in the workspace or research studio." : `Your next module is ${esc(nextModule.title)}. Pick up whenever you’re ready.`}</p><button class="button-primary" data-go="learning">${doneCount === modules.length ? "Review your learning" : "Continue your learning"} ${ICON("arrow")}</button></div><div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="hero-spark spark-one">✳</span><span class="hero-spark spark-two">✦</span><div class="hero-chip chip-top">↗ finding patterns</div><div class="chart-card"><div class="chart-label"><span>YOUR PRACTICE</span><span>${progress}%</span></div><svg class="chart-svg" viewBox="0 0 190 80" preserveAspectRatio="none"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#afe6bb" stop-opacity=".32"/><stop offset="1" stop-color="#afe6bb" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M0 18H190M0 43H190M0 68H190"/><path class="chart-fill" d="M0 66 C23 63 26 54 45 57 S71 46 89 49 S116 23 131 32 S159 16 190 7V80H0Z"/><path class="chart-line" d="M0 66 C23 63 26 54 45 57 S71 46 89 49 S116 23 131 32 S159 16 190 7"/><circle class="chart-node" cx="131" cy="32" r="3.6"/><circle class="chart-node" cx="190" cy="7" r="3.6"/></svg></div><div class="hero-chip chip-bottom"><b>✳</b> one question at a time</div></div></section>
+    <section class="metrics-row"><div class="metric-card"><span class="metric-icon mint">${ICON("trend")}</span><span class="metric-copy"><small>Learning path</small><b>${progress}% <em>${doneCount} of ${modules.length} modules</em></b></span></div><div class="metric-card"><span class="metric-icon yellow">✳</span><span class="metric-copy"><small>Day streak</small><b>${streak} day${streak === 1 ? "" : "s"} <em>${streak ? "nice rhythm" : "start today"}</em></b></span></div><div class="metric-card"><span class="metric-icon lavender">${ICON("clock")}</span><span class="metric-copy"><small>Modules complete</small><b>${doneCount} <em>of ${modules.length}</em></b></span></div><div class="metric-card"><span class="metric-icon blue">${ICON("target")}</span><span class="metric-copy"><small>Lessons complete</small><b>${completedLessons} <em>of ${totalLessons}</em></b></span></div></section>
+    <div class="dashboard-grid"><section><div class="section-heading"><h2>Pick up where you left off</h2><button data-go="learning">See your path ${ICON("arrow")}</button></div><article class="continue-card"><div class="course-art"><svg viewBox="0 0 48 48"><path d="M9 36h29M13 35V17l9-6 10 6v18M17 22h10M17 27h10M19 35v-4h7v4M9 17l13-9 16 9"/><circle cx="33" cy="13" r="3"/></svg></div><div class="course-info"><span class="course-tag">${doneCount === modules.length ? "ALL MODULES COMPLETE" : `MODULE ${String(selectedIndex + 1).padStart(2, "0")} · ${nextModule.lessons} LESSONS`}</span><h3>${esc(nextModule.title)}</h3><p>${doneCount === modules.length ? "Choose another topic to keep exploring." : esc(nextModule.desc)}</p><div class="progress-line"><span style="width:${moduleProgress}%"></span></div><div class="course-progress-meta"><span>${completed[selectedIndex] ? `${nextModule.lessons} of ${nextModule.lessons} lessons` : `0 of ${nextModule.lessons} lessons`}</span><span>${moduleProgress}%</span></div></div><button class="icon-button" data-go="learning" aria-label="Continue learning">${ICON("arrow")}</button></article>
       <div class="section-heading"><h2>A learning path that feels doable</h2><button data-go="learning">All modules ${ICON("arrow")}</button></div><div class="mini-course-grid">${modules.slice(1, 5).map((m, i) => `<article class="mini-course" data-go="learning"><span class="mini-color ${m.color}" style="background:${{ mint: "#e7f5e8", yellow: "#faf2d5", blue: "#e4f2f8", lavender: "#efedfc" }[m.color]}">${["⌘", "▤", "◫", "⌁"][i]}</span><span><b>${esc(m.title)}</b><small>${m.lessons} bite-sized lessons · ${m.time}</small></span></article>`).join("")}</div>
-    </section><aside><div class="section-heading"><h2>Your week, gently</h2><button class="text-link" data-go="learning">This week</button></div><div class="week-card"><div class="week-header"><strong>A lovely little rhythm</strong><span>3 / 5 days</span></div><div class="week-bars"><div class="day-bar"><i class="bar"></i></div><div class="day-bar"><i class="bar"></i></div><div class="day-bar"><i class="bar"></i></div><div class="day-bar"><i class="bar"></i></div><div class="day-bar"><i class="bar"></i></div><div class="day-bar"><i class="bar"></i></div><div class="day-bar"><i class="bar"></i></div></div><div class="day-labels"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div></div><div class="section-heading"><h2>Today’s small plan</h2><span class="eyebrow">15 MIN</span></div><div class="side-card plan-list">${["Meet your first variable", "Explore the student scores", "Write one curious question"].map((label, i) => `<div class="plan-item ${tasks[i] ? "is-done" : ""}"><button class="plan-checkbox ${tasks[i] ? "checked" : ""}" data-task="${i}" aria-label="${tasks[i] ? "Mark incomplete" : "Mark complete"}">${tasks[i] ? ICON("check") : ""}</button><span><b>${label}</b><small>${["5 min · Lesson", "7 min · Practice", "3 min · Research"][i]}</small></span></div>`).join("")}</div><article class="insight-card"><span>A NOTE TO KEEP</span><h3>Start with a question you actually want answered.</h3><button data-go="research">Try the research studio →</button></article></aside></div>`;
+    </section><aside><div class="section-heading"><h2>Your week, gently</h2><button class="text-link" data-go="learning">This week</button></div><div class="week-card"><div class="week-header"><strong>Learning days</strong><span>${activeDays} / 7 days</span></div><div class="week-bars">${weekBars}</div><div class="day-labels">${weekLabels}</div></div><div class="section-heading"><h2>Today’s small plan</h2><span class="eyebrow">15 MIN</span></div><div class="side-card plan-list">${["Meet your first variable", "Explore the student scores", "Write one curious question"].map((label, i) => `<div class="plan-item ${tasks[i] ? "is-done" : ""}"><button class="plan-checkbox ${tasks[i] ? "checked" : ""}" data-task="${i}" aria-label="${tasks[i] ? "Mark incomplete" : "Mark complete"}">${tasks[i] ? ICON("check") : ""}</button><span><b>${label}</b><small>${["5 min · Lesson", "7 min · Practice", "3 min · Research"][i]}</small></span></div>`).join("")}</div><article class="insight-card"><span>A NOTE TO KEEP</span><h3>Start with a question you actually want answered.</h3><button data-go="research">Try the research studio →</button></article></aside></div>`;
 }
 function renderLearning() {
   const doneCount = completed.filter(Boolean).length;
+  const nextIndex = completed.findIndex((isDone) => !isDone);
   return `<div class="page-head"><div><div class="eyebrow">A FRIENDLY ROADMAP</div><h1 class="page-title">Your learning path</h1><p class="page-subtitle">One idea, one small exercise, one step at a time.</p></div><button class="button-primary" data-go="workspace">Open your workspace ${ICON("code")}</button></div>
     <section class="learning-banner"><div><div class="eyebrow">THE FOUNDATIONS</div><h2>A little knowledge goes a long way.</h2><p>Learn at your own pace. Everything you need is right here.</p></div><div class="banner-progress"><div><span>Your progress</span><b>${doneCount} / ${modules.length} modules</b></div><div class="progress-line"><span style="width:${Math.round(doneCount / modules.length * 100)}%"></span></div></div></section>
-    <div class="path-layout"><section class="module-list">${modules.map((m, i) => `<article class="module-card ${m.state === "current" ? "current" : ""} ${completed[i] ? "done" : ""}" data-module="${i}"><div class="module-number">${completed[i] ? ICON("check") : String(i + 1).padStart(2, "0")}</div><div><h3>${esc(m.title)}</h3><p>${esc(m.desc)}</p><div class="module-meta"><span>${ICON("play")}${m.lessons} lessons</span><span>${ICON("clock")}${m.time}</span></div></div><span class="module-status">${completed[i] ? "Complete" : m.state === "current" ? "In progress" : m.state === "done" ? "Complete" : "Up next"}</span></article>`).join("")}</section>
+    <div class="path-layout"><section class="module-list">${modules.map((m, i) => `<article class="module-card ${!completed[i] && nextIndex === i ? "current" : ""} ${completed[i] ? "done" : ""}" data-module="${i}"><div class="module-number">${completed[i] ? ICON("check") : String(i + 1).padStart(2, "0")}</div><div><h3>${esc(m.title)}</h3><p>${esc(m.desc)}</p><div class="module-meta"><span>${ICON("play")}${m.lessons} lessons</span><span>${ICON("clock")}${m.time}</span></div></div><span class="module-status">${completed[i] ? "Complete" : nextIndex === i ? "In progress" : "Up next"}</span></article>`).join("")}</section>
     <aside class="module-side"><div class="side-card"><span class="eyebrow">A SMALL REMINDER</span><h3>You don’t have to know it all yet.</h3><p>Data science is a practice. Every question, wrong turn and “aha!” moment is part of the work.</p></div><div class="side-card"><h3>Your learning rhythm</h3><p style="margin-bottom:12px">Short sessions beat perfect plans. Pick what feels right today.</p><div class="course-stat-row"><span>About this path</span><b>6 modules</b></div><div class="course-stat-row"><span>Time to explore</span><b>~6 hours</b></div><div class="course-stat-row"><span>Your pace</span><b>All yours</b></div></div><div class="side-card"><h3>Try it as you learn</h3><p style="margin-bottom:12px">A real Python workspace is just a click away.</p><button class="button-quiet" data-go="workspace">Go to the code lab ${ICON("arrow")}</button></div></aside></div>`;
 }
 function tableHtml(data) { return `<div class="table-overflow"><table class="dataset-table"><thead><tr>${data.headers.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead><tbody>${data.rows.map((row) => `<tr>${row.map((cell) => `<td>${esc(cell)}</td>`).join("")}</tr>`).join("")}</tbody></table></div><div class="dataset-note">Showing 4 of 6 rows · ${esc(data.file)}</div>`; }
@@ -196,7 +252,7 @@ function ensureWorker() {
   pyWorker.onmessage = (event) => {
     const msg = event.data;
     if (msg.type === "ready") { workerReady = true; setKernelState("Python is ready", "ready"); if (workerBusy) { workerBusy = false; runCode(); } }
-    if (msg.type === "output") { clearTimeout(runTimeout); workerBusy = false; document.getElementById("run-code")?.removeAttribute("disabled"); renderOutput(msg.output || "Code ran successfully. No output yet — try adding a print() statement.", false); }
+    if (msg.type === "output") { clearTimeout(runTimeout); workerBusy = false; document.getElementById("run-code")?.removeAttribute("disabled"); renderOutput(msg.output || "Code ran successfully. No output yet — try adding a print() statement.", false); recordProgress(); }
     if (msg.type === "error") { clearTimeout(runTimeout); workerBusy = false; document.getElementById("run-code")?.removeAttribute("disabled"); setKernelState("Kernel needs a restart"); renderOutput(msg.message || "Something went wrong. Check your code and try again.", true); }
   };
   pyWorker.onerror = () => { workerBusy = false; workerReady = false; setKernelState("Couldn’t load Python"); renderOutput("The Python kernel could not load. Check your internet connection, then press Run code to try again.", true); };
@@ -229,14 +285,14 @@ function bindResearchInputs() {
   document.querySelectorAll("[data-research]").forEach((el) => {
     const key = el.dataset.research;
     if (key === "dataPlan" || key === "reflection") el.value = research[key] || "";
-    el.addEventListener("input", () => { research[key] = el.value; profileSave("research", research); updateResearchProgress(); });
-    el.addEventListener("change", () => { research[key] = el.value; profileSave("research", research); updateResearchProgress(); });
+    el.addEventListener("input", () => { research[key] = el.value; profileSave("research", research); updateResearchProgress(); if (el.value.trim()) recordProgress(); });
+    el.addEventListener("change", () => { research[key] = el.value; profileSave("research", research); updateResearchProgress(); if (el.value.trim()) recordProgress(); });
   });
   document.getElementById("add-source")?.addEventListener("click", addSource);
   document.getElementById("source-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addSource(); } });
   document.getElementById("export-research")?.addEventListener("click", exportResearch);
   document.querySelectorAll("[data-example]").forEach((button) => button.addEventListener("click", () => {
-    research.question = button.dataset.example; const field = document.getElementById("research-question"); if (field) field.value = research.question; profileSave("research", research); updateResearchProgress();
+    research.question = button.dataset.example; const field = document.getElementById("research-question"); if (field) field.value = research.question; profileSave("research", research); updateResearchProgress(); recordProgress();
   }));
   document.querySelectorAll("[data-remove-source]").forEach((button) => button.addEventListener("click", () => { research.sources.splice(Number(button.dataset.removeSource), 1); profileSave("research", research); setPage("research"); }));
 }
@@ -252,7 +308,7 @@ function addSource() {
   const titleEl = document.getElementById("source-title"); const urlEl = document.getElementById("source-url");
   const title = titleEl.value.trim(); if (!title) { titleEl.focus(); toast("Give this source a name first"); return; }
   research.sources.push({ title, url: urlEl.value.trim(), kind: /\.csv($|\?)|dataset|data/i.test(`${title} ${urlEl.value}`) ? "Dataset / data" : "Article / reference" });
-  profileSave("research", research); setPage("research"); toast("Source added to your field notes");
+  profileSave("research", research); recordProgress(); setPage("research"); toast("Source added to your field notes");
 }
 function exportResearch() {
   const lines = [`# ${research.title || "My research field notes"}`, "", `**Research question:** ${research.question || "_To be decided_"}`, "", `**My first hunch:** ${research.hypothesis || "_To be decided_"}`, "", `**Approach:** ${research.approach || "_To be decided_"}`, "", `**Useful for:** ${research.audience || "_To be decided_"}`, "", `**Data I need:** ${research.dataPlan || "_To be decided_"}`, "", `**A limitation to keep in mind:** ${research.reflection || "_To be decided_"}`, "", "## Sources", ...(research.sources.length ? research.sources.map((s) => `- ${s.title}${s.url ? ` — ${s.url}` : ""}`) : ["- Add a dataset or reference when you find one."]), "", "---", "Drafted in Datafield · Keep asking good questions."];
@@ -264,7 +320,7 @@ function openLesson(index) {
   panel.innerHTML = `<article class="lesson-panel"><button class="icon-button small lesson-close" aria-label="Close lesson">${ICON("x")}</button><div class="eyebrow">MODULE ${String(index + 1).padStart(2, "0")} · ${esc(m.time)} · A FIELD NOTE</div><h2>${esc(m.title)}</h2><p>${lesson.intro}</p><div class="lesson-callout"><span class="eyebrow">THE IDEA</span><p>${lesson.concept}</p></div><div class="lesson-example"><span class="eyebrow">A SMALL EXAMPLE</span><p>${lesson.example}</p></div><div class="lesson-practice"><span class="eyebrow">YOUR TURN</span><p>${lesson.exercise}</p></div><div class="lesson-actions"><button class="button-primary" id="practice-module">${index === 1 || index === 2 ? "Try it in the workspace" : index === 5 ? "Open the research studio" : "I’m ready to explore"} ${ICON("arrow")}</button><button class="button-outline" id="complete-module">${completed[index] ? "Mark as in progress" : "Mark this module complete"}</button></div></article>`;
   document.body.appendChild(panel); panel.querySelectorAll(".lesson-close").forEach((b) => b.addEventListener("click", () => panel.remove())); panel.addEventListener("click", (e) => { if (e.target === panel) panel.remove(); });
   panel.querySelector("#practice-module").addEventListener("click", () => { panel.remove(); setPage(index === 5 ? "research" : (index === 1 || index === 2 ? "workspace" : "learning")); });
-  panel.querySelector("#complete-module").addEventListener("click", () => { completed[index] = !completed[index]; profileSave("completed", completed); panel.remove(); setPage("learning"); toast(completed[index] ? "Module marked complete — lovely work" : "Module back in progress"); });
+  panel.querySelector("#complete-module").addEventListener("click", () => { completed[index] = !completed[index]; profileSave("completed", completed); if (completed[index]) recordProgress(); panel.remove(); setPage("learning"); toast(completed[index] ? "Module marked complete — lovely work" : "Module back in progress"); });
 }
 function updateSearch(query) {
   const host = document.getElementById("search-results"); if (!host) return;
@@ -295,6 +351,8 @@ function loadProfileData() {
   if (!Array.isArray(research.sources)) research.sources = [];
   tasks = profileRead("tasks", [false, false, false]);
   completed = profileRead("completed", [false, false, false, false, false, false]);
+  activity = profileRead("activity", []);
+  if (!Array.isArray(activity)) activity = [];
 }
 function switchProfile(profileId) {
   if (!profiles.some((profile) => profile.id === profileId)) return;
@@ -315,6 +373,7 @@ function createProfile(name) {
   STORE.set("profiles", profiles);
   STORE.setProfile(id, "tasks", [false, false, false]);
   STORE.setProfile(id, "completed", [false, false, false, false, false, false]);
+  STORE.setProfile(id, "activity", []);
   switchProfile(id);
 }
 document.getElementById("profile-button").addEventListener("click", showProfileMenu);
@@ -351,7 +410,7 @@ document.addEventListener("click", (event) => {
   if (event.target.id === "stop-kernel") stopKernel();
   const nav = event.target.closest("[data-page]"); if (nav) { event.preventDefault(); setPage(nav.dataset.page); return; }
   const go = event.target.closest("[data-go]"); if (go) { event.preventDefault(); setPage(go.dataset.go); return; }
-  const task = event.target.closest("[data-task]"); if (task) { const index = Number(task.dataset.task); tasks[index] = !tasks[index]; profileSave("tasks", tasks); setPage("dashboard"); return; }
+  const task = event.target.closest("[data-task]"); if (task) { const index = Number(task.dataset.task); tasks[index] = !tasks[index]; profileSave("tasks", tasks); if (tasks[index]) recordProgress(); setPage("dashboard"); return; }
   const module = event.target.closest("[data-module]"); if (module) { openLesson(Number(module.dataset.module)); return; }
   const result = event.target.closest("[data-search-page]"); if (result) { document.getElementById("search-dialog").close(); setPage(result.dataset.searchPage); }
 });

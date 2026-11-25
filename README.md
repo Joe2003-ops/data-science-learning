@@ -21,8 +21,9 @@ To use the app on a phone, connect it to the same Wi-Fi as the PC, leave the ser
 ## What is inside
 
 - **Learning path:** six beginner-friendly modules with progress saved in the browser.
+- **Learner profiles:** create and switch between local profiles. Each profile keeps its own learning progress, code and research notes.
 - **Code workspace:** a Python editor with pandas, sample datasets, output, and CSV download. The browser downloads the Pyodide runtime from jsDelivr the first time the workspace is opened, so an internet connection is needed to start the Python kernel.
 - **Research studio:** a five-step guide for a research question, hypothesis, sources, analysis plan, and limitations. Notes save to local browser storage and export as Markdown.
 - **Responsive layout:** desktop sidebar and compact mobile navigation.
 
-The app itself has no account or server-side database. Your learning progress, code and research notes stay in that browser's local storage.
+Profiles are local to one browser on one device; they do not use passwords or sync between devices. Each profile's learning progress, code and research notes are stored separately in that browser's local storage.

@@ -2,6 +2,8 @@ const ICON = (name) => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
 const STORE = {
   get(key, fallback) { try { const value = localStorage.getItem(`datafield:${key}`); return value === null ? fallback : JSON.parse(value); } catch { return fallback; } },
   set(key, value) { try { localStorage.setItem(`datafield:${key}`, JSON.stringify(value)); } catch { /* storage can be disabled */ } },
+  getProfile(profileId, key, fallback) { try { const value = localStorage.getItem(`datafield:profile:${profileId}:${key}`); return value === null ? fallback : JSON.parse(value); } catch { return fallback; } },
+  setProfile(profileId, key, value) { try { localStorage.setItem(`datafield:profile:${profileId}:${key}`, JSON.stringify(value)); } catch { /* storage can be disabled */ } },
 };
 const modules = [
   { title: "A way of thinking", desc: "Meet the data science process and turn curiosity into a clear question.", time: "25 min", lessons: 3, state: "done", color: "mint" },
@@ -50,16 +52,38 @@ const lessonSearch = [
   { title: "Explore your dataset", detail: "Workspace · pandas", page: "workspace" },
 ];
 let currentPage = "dashboard";
-let currentDataset = STORE.get("dataset", "scores");
-let codeText = STORE.get("code", datasets[currentDataset]?.code || datasets.scores.code);
+const storedProfiles = STORE.get("profiles", null);
+const defaultProfile = { id: "learner-jordan", name: "Jordan Davis", color: 0 };
+let profiles = Array.isArray(storedProfiles) ? storedProfiles.filter((profile) => profile && typeof profile.id === "string" && typeof profile.name === "string" && profile.name.trim()) : [];
+if (!profiles.length) {
+  profiles = [defaultProfile];
+  STORE.set("profiles", profiles);
+  if (!Array.isArray(storedProfiles)) {
+    for (const key of ["dataset", "code", "research", "tasks", "completed"]) {
+      const oldValue = STORE.get(key, null);
+      if (oldValue !== null) STORE.setProfile(defaultProfile.id, key, oldValue);
+    }
+  }
+}
+let activeProfileId = STORE.get("activeProfileId", profiles[0].id);
+if (!profiles.some((profile) => profile.id === activeProfileId)) {
+  activeProfileId = profiles[0].id;
+  STORE.set("activeProfileId", activeProfileId);
+}
+function profileRead(key, fallback) { return STORE.getProfile(activeProfileId, key, fallback); }
+function profileSave(key, value) { STORE.setProfile(activeProfileId, key, value); }
+function activeProfile() { return profiles.find((profile) => profile.id === activeProfileId) || profiles[0]; }
+let currentDataset = profileRead("dataset", "scores");
+let codeText = profileRead("code", datasets[currentDataset]?.code || datasets.scores.code);
 let pyWorker = null;
 let workerReady = false;
 let workerBusy = false;
 let runTimeout = null;
 let toastTimer = null;
-let research = STORE.get("research", { title: "", question: "", hypothesis: "", audience: "", approach: "", dataPlan: "", sources: [] });
-let tasks = STORE.get("tasks", [false, false, false]);
-let completed = STORE.get("completed", [true, false, false, false, false, false]);
+let research = profileRead("research", { title: "", question: "", hypothesis: "", audience: "", approach: "", dataPlan: "", reflection: "", sources: [] });
+if (!Array.isArray(research.sources)) research.sources = [];
+let tasks = profileRead("tasks", [false, false, false]);
+let completed = profileRead("completed", [true, false, false, false, false, false]);
 
 function esc(value = "") { return String(value).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function toast(message) {
@@ -68,6 +92,7 @@ function toast(message) {
 }
 function setPage(page) {
   currentPage = page;
+  updateProfileLabels();
   document.querySelectorAll("[data-page]").forEach((el) => el.classList.toggle("active", el.dataset.page === page));
   const names = { dashboard: "Overview", learning: "Learning path", workspace: "Code workspace", research: "Research studio", resources: "Field notes" };
   document.getElementById("page-crumb").textContent = names[page] || "Overview";
@@ -88,11 +113,23 @@ function renderPage(page) {
   return renderDashboard();
 }
 function dateLabel() { return new Intl.DateTimeFormat(undefined, { weekday: "long", month: "short", day: "numeric" }).format(new Date()); }
+function profileInitials(name) { return name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]).join("").toUpperCase(); }
+function updateProfileLabels() {
+  const profile = activeProfile();
+  const initials = profileInitials(profile.name);
+  const name = document.getElementById("profile-name");
+  const sideAvatar = document.getElementById("profile-avatar");
+  const topAvatar = document.getElementById("top-profile-button");
+  if (name) name.textContent = profile.name;
+  if (sideAvatar) sideAvatar.textContent = initials;
+  if (topAvatar) { topAvatar.textContent = initials; topAvatar.setAttribute("aria-label", `Open profiles · ${profile.name}`); }
+}
 function renderDashboard() {
   const doneCount = completed.filter(Boolean).length;
   const progress = Math.round(doneCount / modules.length * 100);
+  const firstName = activeProfile().name.trim().split(/\s+/)[0];
   return `
-    <div class="greeting-row"><div><div class="eyebrow">YOUR LEARNING, AT A GLANCE</div><h1>Good morning, Jordan <span aria-hidden="true">☀</span></h1><p>Small steps make for a very good data scientist.</p></div><div class="date-pill">${ICON("clock")}<span>${esc(dateLabel())}</span></div></div>
+    <div class="greeting-row"><div><div class="eyebrow">YOUR LEARNING, AT A GLANCE</div><h1>Good morning, ${esc(firstName)} <span aria-hidden="true">☀</span></h1><p>Small steps make for a very good data scientist.</p></div><div class="date-pill">${ICON("clock")}<span>${esc(dateLabel())}</span></div></div>
     <section class="dashboard-hero"><div class="hero-copy"><div class="hero-kicker"><span></span>YOUR NEXT LITTLE WIN</div><h2>Curiosity is a great place to start.</h2><p>Pick up where you left off. Your next lesson is ready when you are.</p><button class="button-primary" data-go="learning">Continue your learning ${ICON("arrow")}</button></div><div class="hero-art" aria-hidden="true"><div class="hero-orbit"></div><span class="hero-spark spark-one">✳</span><span class="hero-spark spark-two">✦</span><div class="hero-chip chip-top">↗ finding patterns</div><div class="chart-card"><div class="chart-label"><span>STUDY TIME ↗ SCORES</span><span>+18%</span></div><svg class="chart-svg" viewBox="0 0 190 80" preserveAspectRatio="none"><defs><linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#afe6bb" stop-opacity=".32"/><stop offset="1" stop-color="#afe6bb" stop-opacity="0"/></linearGradient></defs><path class="chart-grid" d="M0 18H190M0 43H190M0 68H190"/><path class="chart-fill" d="M0 66 C23 63 26 54 45 57 S71 46 89 49 S116 23 131 32 S159 16 190 7V80H0Z"/><path class="chart-line" d="M0 66 C23 63 26 54 45 57 S71 46 89 49 S116 23 131 32 S159 16 190 7"/><circle class="chart-node" cx="131" cy="32" r="3.6"/><circle class="chart-node" cx="190" cy="7" r="3.6"/></svg></div><div class="hero-chip chip-bottom"><b>✳</b> one question at a time</div></div></section>
     <section class="metrics-row"><div class="metric-card"><span class="metric-icon mint">${ICON("trend")}</span><span class="metric-copy"><small>Learning path</small><b>${progress}% <em>↗ on your way</em></b></span></div><div class="metric-card"><span class="metric-icon yellow">✳</span><span class="metric-copy"><small>Day streak</small><b>3 days <em>nice rhythm</em></b></span></div><div class="metric-card"><span class="metric-icon lavender">${ICON("clock")}</span><span class="metric-copy"><small>Time learning</small><b>2.4 hrs</b></span></div><div class="metric-card"><span class="metric-icon blue">${ICON("target")}</span><span class="metric-copy"><small>Lessons finished</small><b>${doneCount} <em>of 31</em></b></span></div></section>
     <div class="dashboard-grid"><section><div class="section-heading"><h2>Pick up where you left off</h2><button data-go="learning">See your path ${ICON("arrow")}</button></div><article class="continue-card"><div class="course-art"><svg viewBox="0 0 48 48"><path d="M9 36h29M13 35V17l9-6 10 6v18M17 22h10M17 27h10M19 35v-4h7v4M9 17l13-9 16 9"/><circle cx="33" cy="13" r="3"/></svg></div><div class="course-info"><span class="course-tag">MODULE 02 · LESSON 02</span><h3>Python, your new toolkit</h3><p>Let’s make a list. Then make it useful.</p><div class="progress-line"><span style="width:32%"></span></div><div class="course-progress-meta"><span>2 of 5 lessons</span><span>32%</span></div></div><button class="icon-button" data-go="learning" aria-label="Continue learning">${ICON("arrow")}</button></article>
@@ -141,7 +178,7 @@ function renderResources() {
 function syncEditor() {
   const editor = document.getElementById("code-editor"); if (!editor) return;
   const data = datasets[currentDataset] || datasets.scores;
-  if (!STORE.get("code", null)) codeText = data.code;
+  if (profileRead("code", null) === null) codeText = data.code;
   editor.value = codeText;
   updateLineNumbers();
 }
@@ -176,7 +213,7 @@ function runCode() {
   if (workerBusy) return;
   if (!workerReady) { workerBusy = true; document.getElementById("run-code")?.setAttribute("disabled", "disabled"); initKernel(); return; }
   const editor = document.getElementById("code-editor"); if (!editor) return;
-  codeText = editor.value; STORE.set("code", codeText); workerBusy = true;
+  codeText = editor.value; profileSave("code", codeText); workerBusy = true;
   document.getElementById("run-code")?.setAttribute("disabled", "disabled");
   setKernelState("Running your code...", "loading"); renderOutput("Running your code…", false);
   pyWorker.postMessage({ type: "run", code: codeText });
@@ -192,16 +229,16 @@ function bindResearchInputs() {
   document.querySelectorAll("[data-research]").forEach((el) => {
     const key = el.dataset.research;
     if (key === "dataPlan" || key === "reflection") el.value = research[key] || "";
-    el.addEventListener("input", () => { research[key] = el.value; STORE.set("research", research); updateResearchProgress(); });
-    el.addEventListener("change", () => { research[key] = el.value; STORE.set("research", research); updateResearchProgress(); });
+    el.addEventListener("input", () => { research[key] = el.value; profileSave("research", research); updateResearchProgress(); });
+    el.addEventListener("change", () => { research[key] = el.value; profileSave("research", research); updateResearchProgress(); });
   });
   document.getElementById("add-source")?.addEventListener("click", addSource);
   document.getElementById("source-url")?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addSource(); } });
   document.getElementById("export-research")?.addEventListener("click", exportResearch);
   document.querySelectorAll("[data-example]").forEach((button) => button.addEventListener("click", () => {
-    research.question = button.dataset.example; const field = document.getElementById("research-question"); if (field) field.value = research.question; STORE.set("research", research); updateResearchProgress();
+    research.question = button.dataset.example; const field = document.getElementById("research-question"); if (field) field.value = research.question; profileSave("research", research); updateResearchProgress();
   }));
-  document.querySelectorAll("[data-remove-source]").forEach((button) => button.addEventListener("click", () => { research.sources.splice(Number(button.dataset.removeSource), 1); STORE.set("research", research); setPage("research"); }));
+  document.querySelectorAll("[data-remove-source]").forEach((button) => button.addEventListener("click", () => { research.sources.splice(Number(button.dataset.removeSource), 1); profileSave("research", research); setPage("research"); }));
 }
 function updateResearchProgress() {
   const done = [Boolean(research.title.trim() && research.question.trim()), Boolean(research.hypothesis.trim()), Boolean(research.sources.length), Boolean(research.approach && research.dataPlan.trim()), Boolean(research.reflection?.trim())];
@@ -215,7 +252,7 @@ function addSource() {
   const titleEl = document.getElementById("source-title"); const urlEl = document.getElementById("source-url");
   const title = titleEl.value.trim(); if (!title) { titleEl.focus(); toast("Give this source a name first"); return; }
   research.sources.push({ title, url: urlEl.value.trim(), kind: /\.csv($|\?)|dataset|data/i.test(`${title} ${urlEl.value}`) ? "Dataset / data" : "Article / reference" });
-  STORE.set("research", research); setPage("research"); toast("Source added to your field notes");
+  profileSave("research", research); setPage("research"); toast("Source added to your field notes");
 }
 function exportResearch() {
   const lines = [`# ${research.title || "My research field notes"}`, "", `**Research question:** ${research.question || "_To be decided_"}`, "", `**My first hunch:** ${research.hypothesis || "_To be decided_"}`, "", `**Approach:** ${research.approach || "_To be decided_"}`, "", `**Useful for:** ${research.audience || "_To be decided_"}`, "", `**Data I need:** ${research.dataPlan || "_To be decided_"}`, "", `**A limitation to keep in mind:** ${research.reflection || "_To be decided_"}`, "", "## Sources", ...(research.sources.length ? research.sources.map((s) => `- ${s.title}${s.url ? ` — ${s.url}` : ""}`) : ["- Add a dataset or reference when you find one."]), "", "---", "Drafted in Datafield · Keep asking good questions."];
@@ -227,7 +264,7 @@ function openLesson(index) {
   panel.innerHTML = `<article class="lesson-panel"><button class="icon-button small lesson-close" aria-label="Close lesson">${ICON("x")}</button><div class="eyebrow">MODULE ${String(index + 1).padStart(2, "0")} · ${esc(m.time)} · A FIELD NOTE</div><h2>${esc(m.title)}</h2><p>${lesson.intro}</p><div class="lesson-callout"><span class="eyebrow">THE IDEA</span><p>${lesson.concept}</p></div><div class="lesson-example"><span class="eyebrow">A SMALL EXAMPLE</span><p>${lesson.example}</p></div><div class="lesson-practice"><span class="eyebrow">YOUR TURN</span><p>${lesson.exercise}</p></div><div class="lesson-actions"><button class="button-primary" id="practice-module">${index === 1 || index === 2 ? "Try it in the workspace" : index === 5 ? "Open the research studio" : "I’m ready to explore"} ${ICON("arrow")}</button><button class="button-outline" id="complete-module">${completed[index] ? "Mark as in progress" : "Mark this module complete"}</button></div></article>`;
   document.body.appendChild(panel); panel.querySelectorAll(".lesson-close").forEach((b) => b.addEventListener("click", () => panel.remove())); panel.addEventListener("click", (e) => { if (e.target === panel) panel.remove(); });
   panel.querySelector("#practice-module").addEventListener("click", () => { panel.remove(); setPage(index === 5 ? "research" : (index === 1 || index === 2 ? "workspace" : "learning")); });
-  panel.querySelector("#complete-module").addEventListener("click", () => { completed[index] = !completed[index]; STORE.set("completed", completed); panel.remove(); setPage("learning"); toast(completed[index] ? "Module marked complete — lovely work" : "Module back in progress"); });
+  panel.querySelector("#complete-module").addEventListener("click", () => { completed[index] = !completed[index]; profileSave("completed", completed); panel.remove(); setPage("learning"); toast(completed[index] ? "Module marked complete — lovely work" : "Module back in progress"); });
 }
 function updateSearch(query) {
   const host = document.getElementById("search-results"); if (!host) return;
@@ -235,28 +272,97 @@ function updateSearch(query) {
   host.innerHTML = found.length ? found.map((item) => `<button class="search-result" data-search-page="${item.page}">${ICON(item.page === "workspace" ? "code" : item.page === "research" ? "flask" : "book")}<span><b>${esc(item.title)}</b><small>${esc(item.detail)}</small></span>${ICON("arrow")}</button>`).join("") : `<div class="search-empty">No matches yet. Try “Python” or “research”.</div>`;
 }
 function showSearch() { const dialog = document.getElementById("search-dialog"); dialog.showModal(); updateSearch(""); setTimeout(() => document.getElementById("search-input").focus(), 40); }
+const profileColors = ["#e3f1e5", "#fbf1d3", "#e9e6fb", "#e1f0f5", "#f9e7df", "#e9eee0"];
+function profileColor(index) { return profileColors[index % profileColors.length]; }
+function renderProfileList() {
+  const list = document.getElementById("profile-list");
+  list.innerHTML = profiles.map((profile) => {
+    const selected = profile.id === activeProfileId;
+    return `<button class="profile-card ${selected ? "selected" : ""}" type="button" data-profile-id="${esc(profile.id)}"><span class="profile-list-avatar" style="--profile-color:${profileColor(profile.color || 0)}">${esc(profileInitials(profile.name))}</span><span class="profile-card-copy"><b>${esc(profile.name)}</b><small>${selected ? "Currently active" : "Local learner profile"}</small></span><span class="profile-card-check">${selected ? ICON("check") : ICON("arrow")}</span></button>`;
+  }).join("");
+}
+function showProfileMenu() {
+  renderProfileList();
+  document.getElementById("create-profile-form").hidden = true;
+  document.getElementById("show-create-profile").hidden = false;
+  document.getElementById("profile-dialog").showModal();
+}
+function loadProfileData() {
+  currentDataset = profileRead("dataset", "scores");
+  if (!datasets[currentDataset]) currentDataset = "scores";
+  codeText = profileRead("code", datasets[currentDataset].code);
+  research = profileRead("research", { title: "", question: "", hypothesis: "", audience: "", approach: "", dataPlan: "", reflection: "", sources: [] });
+  if (!Array.isArray(research.sources)) research.sources = [];
+  tasks = profileRead("tasks", [false, false, false]);
+  completed = profileRead("completed", [false, false, false, false, false, false]);
+}
+function switchProfile(profileId) {
+  if (!profiles.some((profile) => profile.id === profileId)) return;
+  if (pyWorker) { pyWorker.terminate(); pyWorker = null; workerReady = false; workerBusy = false; clearTimeout(runTimeout); }
+  activeProfileId = profileId;
+  STORE.set("activeProfileId", activeProfileId);
+  loadProfileData();
+  document.getElementById("profile-dialog").close();
+  setPage(currentPage);
+  toast(`Switched to ${activeProfile().name}`);
+}
+function createProfile(name) {
+  const cleanName = name.trim().replace(/\s+/g, " ");
+  if (!cleanName) return;
+  const id = `learner-${globalThis.crypto?.randomUUID?.() || Date.now().toString(36)}`;
+  const profile = { id, name: cleanName, color: profiles.length % profileColors.length };
+  profiles.push(profile);
+  STORE.set("profiles", profiles);
+  STORE.setProfile(id, "tasks", [false, false, false]);
+  STORE.setProfile(id, "completed", [false, false, false, false, false, false]);
+  switchProfile(id);
+}
+document.getElementById("profile-button").addEventListener("click", showProfileMenu);
+document.getElementById("top-profile-button").addEventListener("click", showProfileMenu);
+document.getElementById("show-create-profile").addEventListener("click", () => {
+  document.getElementById("show-create-profile").hidden = true;
+  document.getElementById("create-profile-form").hidden = false;
+  document.getElementById("new-profile-name").focus();
+});
+document.getElementById("cancel-create-profile").addEventListener("click", () => {
+  document.getElementById("create-profile-form").hidden = true;
+  document.getElementById("show-create-profile").hidden = false;
+  document.getElementById("new-profile-name").value = "";
+});
+document.getElementById("create-profile-form").addEventListener("submit", (event) => {
+  event.preventDefault();
+  createProfile(document.getElementById("new-profile-name").value);
+});
+document.getElementById("profile-list").addEventListener("click", (event) => {
+  const choice = event.target.closest("[data-profile-id]");
+  if (!choice) return;
+  if (choice.dataset.profileId === activeProfileId) document.getElementById("profile-dialog").close();
+  else switchProfile(choice.dataset.profileId);
+});
+document.getElementById("close-profile-menu").addEventListener("click", () => document.getElementById("profile-dialog").close());
+document.getElementById("profile-dialog").addEventListener("click", (event) => { if (event.target.id === "profile-dialog") event.target.close(); });
 
 document.addEventListener("click", (event) => {
   if (event.target.closest("#open-search")) { showSearch(); return; }
   if (event.target.id === "run-code") runCode();
   if (event.target.id === "clear-output") renderOutput("Output cleared. Your next result will appear here.", false);
-  if (event.target.id === "reset-code" || event.target.id === "format-code") { const editor = document.getElementById("code-editor"); if (editor) { codeText = datasets[currentDataset].code; editor.value = codeText; STORE.set("code", codeText); updateLineNumbers(); toast("Example restored"); } }
+  if (event.target.id === "reset-code" || event.target.id === "format-code") { const editor = document.getElementById("code-editor"); if (editor) { codeText = datasets[currentDataset].code; editor.value = codeText; profileSave("code", codeText); updateLineNumbers(); toast("Example restored"); } }
   if (event.target.id === "download-csv") { const data = datasets[currentDataset]; const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([data.csv], { type: "text/csv" })); link.download = data.file; link.click(); URL.revokeObjectURL(link.href); }
   if (event.target.id === "stop-kernel") stopKernel();
   const nav = event.target.closest("[data-page]"); if (nav) { event.preventDefault(); setPage(nav.dataset.page); return; }
   const go = event.target.closest("[data-go]"); if (go) { event.preventDefault(); setPage(go.dataset.go); return; }
-  const task = event.target.closest("[data-task]"); if (task) { const index = Number(task.dataset.task); tasks[index] = !tasks[index]; STORE.set("tasks", tasks); setPage("dashboard"); return; }
+  const task = event.target.closest("[data-task]"); if (task) { const index = Number(task.dataset.task); tasks[index] = !tasks[index]; profileSave("tasks", tasks); setPage("dashboard"); return; }
   const module = event.target.closest("[data-module]"); if (module) { openLesson(Number(module.dataset.module)); return; }
   const result = event.target.closest("[data-search-page]"); if (result) { document.getElementById("search-dialog").close(); setPage(result.dataset.searchPage); }
 });
 document.addEventListener("input", (event) => {
-  if (event.target.id === "code-editor") { codeText = event.target.value; STORE.set("code", codeText); updateLineNumbers(); }
+  if (event.target.id === "code-editor") { codeText = event.target.value; profileSave("code", codeText); updateLineNumbers(); }
   if (event.target.id === "search-input") updateSearch(event.target.value);
 });
 document.addEventListener("keydown", (event) => {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") { event.preventDefault(); showSearch(); }
   if ((event.metaKey || event.ctrlKey) && event.key === "Enter" && currentPage === "workspace") { event.preventDefault(); runCode(); }
-  if (event.target.id === "code-editor" && event.key === "Tab") { event.preventDefault(); const el = event.target; const start = el.selectionStart; const end = el.selectionEnd; el.setRangeText("    ", start, end, "end"); codeText = el.value; STORE.set("code", codeText); updateLineNumbers(); }
+  if (event.target.id === "code-editor" && event.key === "Tab") { event.preventDefault(); const el = event.target; const start = el.selectionStart; const end = el.selectionEnd; el.setRangeText("    ", start, end, "end"); codeText = el.value; profileSave("code", codeText); updateLineNumbers(); }
 });
 document.getElementById("mobile-menu").addEventListener("click", () => {
   const sidebar = document.getElementById("sidebar"); sidebar.classList.toggle("open");
@@ -265,15 +371,14 @@ document.getElementById("mobile-menu").addEventListener("click", () => {
 });
 document.getElementById("open-search").addEventListener("click", showSearch);
 document.getElementById("notifications").addEventListener("click", () => toast("You’re all caught up. Take a breath 🌿"));
-document.getElementById("profile-button").addEventListener("click", () => toast("Learning progress is saved in this browser."));
-document.getElementById("new-project").addEventListener("click", () => { setPage("research"); if (!research.title) { research.title = "My new research project"; const field = document.getElementById("research-title"); field.value = research.title; STORE.set("research", research); updateResearchProgress(); } document.getElementById("research-title")?.focus(); });
+document.getElementById("new-project").addEventListener("click", () => { setPage("research"); if (!research.title) { research.title = "My new research project"; const field = document.getElementById("research-title"); field.value = research.title; profileSave("research", research); updateResearchProgress(); } document.getElementById("research-title")?.focus(); });
 document.getElementById("search-dialog").addEventListener("click", (e) => { if (e.target.id === "search-dialog") e.target.close(); });
 document.addEventListener("click", (event) => {
   if (event.target.id === "run-code") runCode();
 });
 document.addEventListener("change", (event) => {
   if (event.target.id === "dataset-select") {
-    currentDataset = event.target.value; STORE.set("dataset", currentDataset); codeText = datasets[currentDataset].code; STORE.set("code", codeText);
+    currentDataset = event.target.value; profileSave("dataset", currentDataset); codeText = datasets[currentDataset].code; profileSave("code", codeText);
     const editor = document.getElementById("code-editor"); if (editor) { editor.value = codeText; updateLineNumbers(); }
     const table = document.querySelector(".workspace-sidebar .dataset-table")?.closest(".guide-card"); if (table) { const p = table.querySelector("p"); p.textContent = `${datasets[currentDataset].label} · a small, friendly sample to explore.`; table.querySelector(".table-overflow").outerHTML = tableHtml(datasets[currentDataset]); }
     pyWorker?.postMessage({ type: "dataset", csv: datasets[currentDataset].csv });

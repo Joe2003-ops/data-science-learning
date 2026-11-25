@@ -58,7 +58,7 @@
         </div>
         <div class="sidebar-bottom">
           <div class="streak-mini"><span class="flame">✳</span><span><b id="sidebar-streak">3 day streak</b><small>A little progress adds up.</small></span></div>
-          <button class="profile-row" id="profile-button"><span class="avatar">JD</span><span><b>Jordan Davis</b><small>Curious beginner</small></span><svg><use href="#i-chevron"/></svg></button>
+          <button class="profile-row" id="profile-button" aria-haspopup="dialog" aria-controls="profile-dialog"><span class="avatar" id="profile-avatar">JD</span><span><b id="profile-name">Jordan Davis</b><small>Switch profile or add learner</small></span><svg><use href="#i-chevron"/></svg></button>
         </div>
       </aside>
 
@@ -69,7 +69,7 @@
           <div class="topbar-actions">
             <button class="search-button" id="open-search"><svg><use href="#i-search"/></svg><span>Search lessons, concepts...</span><kbd>⌘ K</kbd></button>
             <button class="icon-button notification-button" id="notifications" aria-label="Notifications"><svg><use href="#i-bell"/></svg><i></i></button>
-            <span class="top-avatar">JD</span>
+            <button class="top-avatar" id="top-profile-button" aria-label="Open learner profiles" aria-haspopup="dialog" aria-controls="profile-dialog">JD</button>
           </div>
         </header>
         <main id="main-view" class="main-view" tabindex="-1"></main>
@@ -87,6 +87,22 @@
     <dialog class="search-dialog" id="search-dialog">
       <form method="dialog"><div class="search-dialog-input"><svg><use href="#i-search"/></svg><input id="search-input" placeholder="Find a lesson or concept..." autocomplete="off" /><kbd>ESC</kbd><button class="icon-button small" aria-label="Close search"><svg><use href="#i-x"/></svg></button></div></form>
       <div class="search-results" id="search-results"></div>
+    </dialog>
+    <dialog class="profile-dialog" id="profile-dialog" aria-labelledby="profile-dialog-title">
+      <section class="profile-menu">
+        <button class="icon-button small profile-close" id="close-profile-menu" aria-label="Close profile menu"><svg><use href="#i-x"/></svg></button>
+        <div class="eyebrow">YOUR LEARNING SPACE</div>
+        <h2 id="profile-dialog-title">Who’s learning today?</h2>
+        <p class="profile-intro">Choose a profile or make a new one.</p>
+        <div class="profile-list" id="profile-list"></div>
+        <button class="button-outline create-profile-toggle" id="show-create-profile"><svg><use href="#i-plus"/></svg> Create a new profile</button>
+        <form class="profile-create-form" id="create-profile-form" hidden>
+          <label for="new-profile-name">What should we call you?</label>
+          <input id="new-profile-name" name="profileName" maxlength="36" placeholder="Your name" autocomplete="given-name" required />
+          <div class="profile-form-actions"><button class="button-outline" type="button" id="cancel-create-profile">Back</button><button class="button-primary" type="submit">Create profile <svg><use href="#i-arrow"/></svg></button></div>
+        </form>
+        <p class="profile-privacy">Profiles and progress are saved only in this browser on this device.</p>
+      </section>
     </dialog>
   </body>
 </html>
